@@ -1,0 +1,3 @@
+master-key-ed25519 hoge
+router-signature
+router-sig-ed25519

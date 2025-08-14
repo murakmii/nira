@@ -1,0 +1,5 @@
+onion-key
+-----BEGIN RSA PUBLIC KEY-----
+Zm9v
+YmFy
+-----END ED PUBLIC KEY-----

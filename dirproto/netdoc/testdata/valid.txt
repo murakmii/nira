@@ -1,0 +1,18 @@
+master-key-ed25519 hoge
+platform Tor 0.4.8.10 on Linux
+onion-key
+-----BEGIN RSA PUBLIC KEY-----
+Zm9v
+YmFy
+-----END RSA PUBLIC KEY-----
+uptime 12345
+ntor-onion-key-crosscert 0
+-----BEGIN ED25519 CERT-----
+MTIzNDU2
+Nzg5MA==
+-----END ED25519 CERT-----
+ntor-onion-key-crosscert 1
+-----BEGIN ED25519 CERT-----
+MTIzNDU2
+Nzg5MA==
+-----END ED25519 CERT-----

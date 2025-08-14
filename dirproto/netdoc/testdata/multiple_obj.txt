@@ -1,0 +1,9 @@
+onion-key
+-----BEGIN RSA PUBLIC KEY-----
+Zm9v
+YmFy
+-----END RSA PUBLIC KEY-----
+-----BEGIN ED25519 CERT-----
+MTIzNDU2
+Nzg5MA==
+-----END ED25519 CERT-----
