@@ -1,30 +1,39 @@
 package socks5
 
 import (
-	"bytes"
-	"encoding/binary"
 	"errors"
-	"fmt"
 	"io"
 	"net"
+	"slices"
 	"sync"
+
+	"github.com/murakmii/nira/log"
 )
 
 type (
 	Gateway struct {
 		listenAddr string
-		stopCh     chan struct{}
+		logger     log.Logger
 		connFunc   ConnectorFunc
+
+		stopCh chan struct{}
 	}
 
-	ConnectorFunc func(ip net.IP, port uint16) (net.IP, uint16, io.ReadWriteCloser, error)
+	// ConnectorFunc is function receives remote host info and proxy on any protocol.
+	// Return values are bind address and remote host IO stream.
+	ConnectorFunc func(ip net.IP, port uint16, logger log.Logger) (net.IP, uint16, io.ReadWriteCloser, error)
 )
 
-func BuildGateway(listenAddr string, connFunc ConnectorFunc) *Gateway {
+func BuildGateway(listenAddr string, logger log.Logger, connFunc ConnectorFunc) *Gateway {
+	if logger == nil {
+		logger = log.NopLogger
+	}
+
 	return &Gateway{
 		listenAddr: listenAddr,
-		stopCh:     make(chan struct{}),
+		logger:     logger,
 		connFunc:   connFunc,
+		stopCh:     make(chan struct{}),
 	}
 }
 
@@ -32,6 +41,8 @@ func (g *Gateway) Addr() string {
 	return g.listenAddr
 }
 
+// Listen starts accepting connection.
+// This method blocks until calling Stop method and all connections closed.
 func (g *Gateway) Listen() error {
 	listener, err := net.Listen("tcp", g.listenAddr)
 	if err != nil {
@@ -41,9 +52,13 @@ func (g *Gateway) Listen() error {
 
 	accepted := make(chan net.Conn)
 	go func() {
+		g.logger.I("listen on %s", listener.Addr())
 		for {
 			conn, err := listener.Accept()
 			if err != nil {
+				if !errors.Is(err, net.ErrClosed) {
+					g.logger.E("listener stopped. %s", err)
+				}
 				close(accepted)
 				break
 			}
@@ -55,6 +70,7 @@ func (g *Gateway) Listen() error {
 	for accepting := true; accepting; {
 		select {
 		case <-g.stopCh:
+			g.logger.I("stopping...")
 			listener.Close()
 		case conn, ok := <-accepted:
 			if !ok {
@@ -70,6 +86,7 @@ func (g *Gateway) Listen() error {
 	}
 
 	liveConn.Wait()
+	g.logger.I("stopped")
 	return nil
 }
 
@@ -77,10 +94,12 @@ func (g *Gateway) Stop() {
 	close(g.stopCh)
 }
 
+// handleConn method establishes connection
+// and transfer data bidirectionally until connection closed.
 func (g *Gateway) handleConn(src net.Conn) {
-	dest, err := g.negotiate(src)
+	dest, err := g.establish(src)
 	if err != nil {
-		fmt.Printf("negotiation error: %s\n", err)
+		g.logger.E("socks5 establishing failed: %s", err)
 		return
 	}
 
@@ -106,50 +125,48 @@ func (g *Gateway) handleConn(src net.Conn) {
 			needClose = false
 		}
 	}
+
+	g.logger.D("connection closed. err1=%s, err2=%s", errs[0], errs[1])
 }
 
-func (g *Gateway) negotiate(src net.Conn) (io.ReadWriteCloser, error) {
+// establish method checks method selection and request message.
+// We only accept CONNECT command(no auth) with IPv4 address.
+// See: https://datatracker.ietf.org/doc/html/rfc1928
+func (g *Gateway) establish(src net.Conn) (io.ReadWriteCloser, error) {
 	methods, err := ParseMethodSelection(src)
 	if err != nil {
 		src.Close()
 		return nil, err
 	}
 
-	if !bytes.Contains(methods, []byte{0x00}) {
-		src.Write([]byte{0x05, 0xFF})
+	if slices.Index(methods, noAuthMethod) == -1 {
+		src.Write(noAcceptableMethodsReply)
 		src.Close()
 		return nil, errors.New("no acceptable methods")
 	}
 
-	if _, err := src.Write([]byte{0x05, 0x00}); err != nil {
+	if _, err := src.Write(noAuthSelectedReply); err != nil {
 		src.Close()
 		return nil, err
 	}
 
 	addr, port, err := ParseRequest(src)
 	if err != nil {
-		if protoErr, ok := err.(*ProtocolError); ok {
-			src.Write(protoErr.ToErrorReply())
-			src.Close()
-			return nil, err
+		if protoErr, ok := err.(ErrorReplyCode); ok {
+			src.Write(protoErr.ReplyBytes())
 		}
-	}
-
-	bindAddr, bindPort, conn, err := g.connFunc(addr, port)
-	if err != nil {
-		src.Write(NewProtocolError("failed to connect remote host", 0x03).ToErrorReply())
 		src.Close()
 		return nil, err
 	}
 
-	reply := make([]byte, 10)
-	reply[0] = 0x05
-	reply[1] = 0x00
-	reply[3] = 0x01
-	copy(reply[4:], bindAddr.To4())
-	binary.BigEndian.PutUint16(reply[8:], bindPort)
+	bindAddr, bindPort, conn, err := g.connFunc(addr, port, g.logger)
+	if err != nil {
+		src.Write(UnreachableReply.ReplyBytes())
+		src.Close()
+		return nil, err
+	}
 
-	if _, err := src.Write(reply); err != nil {
+	if _, err := src.Write(NewEstablishedReply(succeededReply, bindAddr, bindPort)); err != nil {
 		src.Close()
 		conn.Close()
 		return nil, err

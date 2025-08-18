@@ -3,30 +3,61 @@ package socks5
 import (
 	"encoding/binary"
 	"errors"
-	"fmt"
 	"io"
 	"net"
 )
 
 type (
-	ProtocolError struct {
-		msg  string
-		code byte
-	}
+	ErrorReplyCode byte
 )
 
-func NewProtocolError(message string, code byte) *ProtocolError {
-	return &ProtocolError{msg: message, code: code}
+const (
+	noAuthMethod   byte = 0x00
+	succeededReply byte = 0x00
+
+	FailureReply         ErrorReplyCode = 0x01
+	UnreachableReply     ErrorReplyCode = 0x04
+	CmdNotSupportedReply ErrorReplyCode = 0x07
+	AddrTypeNotSupported ErrorReplyCode = 0x08
+)
+
+var (
+	noAuthSelectedReply      = []byte{0x05, 0x00}
+	noAcceptableMethodsReply = []byte{0x05, 0xFF}
+)
+
+func (repCode ErrorReplyCode) Error() string {
+	switch repCode {
+	case FailureReply:
+		return "general SOCKS server failure"
+	case UnreachableReply:
+		return "Host unreachable"
+	case CmdNotSupportedReply:
+		return "Command not supported"
+	case AddrTypeNotSupported:
+		return "Address type not supported"
+	default:
+		return "Unknown reply code"
+	}
 }
 
-func (protoErr *ProtocolError) Code() byte    { return protoErr.code }
-func (protoErr *ProtocolError) Error() string { return protoErr.msg }
+func (repCode ErrorReplyCode) ReplyBytes() []byte {
+	return NewEstablishedReply(byte(repCode), nil, 0)
+}
 
-func (protoErr *ProtocolError) ToErrorReply() []byte {
+func NewEstablishedReply(req byte, ip net.IP, port uint16) []byte {
 	reply := make([]byte, 10)
 	reply[0] = 0x05
-	reply[1] = protoErr.code
+	reply[1] = req
 	reply[3] = 0x01
+
+	if ip != nil {
+		copy(reply[4:], ip.To4())
+	}
+	if port != 0 {
+		binary.BigEndian.PutUint16(reply[8:], port)
+	}
+
 	return reply
 }
 
@@ -38,7 +69,7 @@ func ParseMethodSelection(r io.Reader) ([]byte, error) {
 	if verAndCount[0] != 0x05 {
 		return nil, errors.New("version is NOT 5")
 	}
-	if verAndCount[1] == 0 {
+	if verAndCount[1] == 0 { // No suggested methods
 		return nil, nil
 	}
 
@@ -55,14 +86,11 @@ func ParseRequest(r io.Reader) (net.IP, uint16, error) {
 	if _, err := io.ReadFull(r, untilAddrType); err != nil {
 		return nil, 0, err
 	}
-	if untilAddrType[0] != 0x05 {
-		return nil, 0, NewProtocolError("version is NOT 5", 0x01)
+	if untilAddrType[0] != 0x05 || untilAddrType[2] != 0x00 {
+		return nil, 0, FailureReply
 	}
 	if untilAddrType[1] != 0x01 {
-		return nil, 0, NewProtocolError(fmt.Sprintf("command '%d' is NOT supported", untilAddrType[1]), 0x07)
-	}
-	if untilAddrType[2] != 0x00 {
-		return nil, 0, NewProtocolError("reserved byte in request is MUST be 0", 0x01)
+		return nil, 0, CmdNotSupportedReply
 	}
 
 	var addr net.IP
@@ -82,7 +110,7 @@ func ParseRequest(r io.Reader) (net.IP, uint16, error) {
 		if _, err := io.ReadFull(r, lenByte); err != nil {
 			return nil, 0, err
 		}
-		domain := make([]byte, lenByte[0]+2)
+		domain := make([]byte, lenByte[0]+2) // read more 2 bytes to read port number together
 		if _, err := io.ReadFull(r, domain); err != nil {
 			return nil, 0, err
 		}
@@ -94,7 +122,7 @@ func ParseRequest(r io.Reader) (net.IP, uint16, error) {
 		portBytes = domain[len(domain)-2:]
 
 	case 0x04:
-		return nil, 0, NewProtocolError("IPv6 is NOT supported", 0x08)
+		return nil, 0, AddrTypeNotSupported
 	}
 
 	return addr, binary.BigEndian.Uint16(portBytes), nil

@@ -4,20 +4,22 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 
+	"github.com/murakmii/nira/log"
 	"github.com/murakmii/nira/socks5/connector"
 	"golang.org/x/net/proxy"
 )
 
-func TestGatewayProxying(t *testing.T) {
+func TestGateway_Listen(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(200)
 		w.Write([]byte("hello, socks5!"))
 	}))
 	defer server.Close()
 
-	sut := BuildGateway("127.0.0.1:30000", connector.TCP)
+	sut := BuildGateway("127.0.0.1:30000", log.NewLogger(log.DebugLog, os.Stdout), connector.TCP)
 	stopped := make(chan struct{})
 
 	defer func() {
