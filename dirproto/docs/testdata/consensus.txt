@@ -1,0 +1,42 @@
+network-status-version 3
+vote-status consensus
+consensus-method 33
+valid-after 2025-08-20 11:45:00
+fresh-until 2025-08-20 11:50:00
+valid-until 2025-08-20 12:00:00
+voting-delay 20 20
+client-versions 
+server-versions 
+known-flags Authority Exit Fast Guard HSDir NoEdConsensus Running Stable StaleDesc Sybil V2Dir Valid
+recommended-client-protocols Cons=2 Desc=2 DirCache=2 FlowCtrl=1-2 HSDir=2 HSIntro=4 HSRend=2 Link=4-5 Microdesc=2 Relay=2-4
+recommended-relay-protocols Cons=2 Desc=2 DirCache=2 FlowCtrl=1-2 HSDir=2 HSIntro=4-5 HSRend=2 Link=4-5 LinkAuth=3 Microdesc=2 Relay=2-4
+required-client-protocols Cons=2 Desc=2 FlowCtrl=1 Link=4 Microdesc=2 Relay=2
+required-relay-protocols Cons=2 Desc=2 DirCache=2 FlowCtrl=1-2 HSDir=2 HSIntro=4-5 HSRend=2 Link=4-5 LinkAuth=3 Microdesc=2 Relay=2-4
+shared-rand-previous-value 1 mxtuI7c4azM5usMiMnV61jkYqVphBjlavqjml0mt3s8=
+shared-rand-current-value 1 wZ0sBezqVe+2vxIwrPEKzkYHKbYPxKllW+bZQG56v9E=
+dir-source da1 90ADABDA25819E52732AD9B58090E375D00CED83 10.5.1.10 10.5.1.10 80 9001
+contact da1 <da1 AT localhost>
+vote-digest A7AF2FD99CAE8D14E0EC1DC53FE2E96E339ED564
+r relay1 CZCrndZaUjnWhZ+zTaS7I1mibBo TNVcBYlgNhsSYPvMSw2fjQ8E/F8 2025-08-20 05:35:33 10.5.1.20 9001 0
+s Fast Guard HSDir Running Stable V2Dir Valid
+v Tor 0.4.8.17
+pr Conflux=1 Cons=1-2 Desc=1-2 DirCache=2 FlowCtrl=1-2 HSDir=2 HSIntro=4-5 HSRend=1-2 Link=1-5 LinkAuth=1,3 Microdesc=1-2 Padding=2 Relay=1-4
+w Bandwidth=0 Unmeasured=1
+p reject 1-65535
+r da1 PkrNDwaaAhCJY+v9oCPQ9fhxDQk dhOqLKtuXgIISx3iutyUb4yFY5U 2025-08-20 03:24:42 10.5.1.10 9001 80
+s Authority Fast Guard HSDir Running Stable V2Dir Valid
+v Tor 0.4.8.17
+pr Conflux=1 Cons=1-2 Desc=1-2 DirCache=2 FlowCtrl=1-2 HSDir=2 HSIntro=4-5 HSRend=1-2 Link=1-5 LinkAuth=1,3 Microdesc=1-2 Padding=2 Relay=1-4
+w Bandwidth=0 Unmeasured=1
+p reject 1-65535
+directory-footer
+bandwidth-weights Wbd=3333 Wbe=0 Wbg=0 Wbm=10000 Wdb=10000 Web=10000 Wed=3333 Wee=10000 Weg=3333 Wem=10000 Wgb=10000 Wgd=3333 Wgg=10000 Wgm=10000 Wmb=10000 Wmd=3333 Wme=0 Wmg=0 Wmm=10000
+directory-signature 90ADABDA25819E52732AD9B58090E375D00CED83 551665128062AB66356229F030F6C49B55D98D8E
+-----BEGIN SIGNATURE-----
+bLmVDs//myb1uM8lNNiPGFh2+0/xsGCJlWvP05AuXJ7C83+5L4+D5bTCG7AAAszg
+Qsj2RGZ5dnLDxosqxL9l+/U3gI5nKJ5TcPEe09xCoSCba+w6B9+OcH+hzguE8QVC
+bLbhD9TARiwZtrdIFp+0U/nadty2kutYccvbfu07u0RSOmsIdfVU25jCyinfMNb9
+DSwrE7efu9y362wM0xrBTheQujBnG0snBMZIFM2DvdslFPHLITiiMfarV8PtYwD/
++amir3GgXfUz2E39qhCB5EDrLjHqc6zRFBSuF0nBN+ZRsFMvCi3bPYAjwJ/E9FfR
+dQpwgkD41B82HD/cfOG+Iw==
+-----END SIGNATURE-----
