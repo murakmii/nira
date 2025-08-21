@@ -3,6 +3,7 @@ package cert
 import (
 	"bytes"
 	"crypto/ed25519"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/pem"
 	"io"
@@ -37,8 +38,16 @@ func mustDecodeHex(s string) []byte {
 	return b
 }
 
+func mustDecodeBase64(s string) []byte {
+	b, err := base64.RawStdEncoding.DecodeString(s)
+	if err != nil {
+		panic(err)
+	}
+	return b
+}
+
 func TestParseEd25519Cert(t *testing.T) {
-	got, err := ParseEd25519Cert(mustLoadTestPEM("testdata/cert.pem"))
+	got, err := ParseEd25519Cert(mustLoadTestPEM("testdata/type04.pem"))
 	if err != nil {
 		t.Fatalf("ParseEd25519Cert failed: %v", err)
 	}
@@ -69,7 +78,7 @@ func TestParseEd25519Cert(t *testing.T) {
 }
 
 func TestEd25519_Encode(t *testing.T) {
-	srcBytes := mustLoadTestPEM("testdata/cert.pem")
+	srcBytes := mustLoadTestPEM("testdata/type04.pem")
 	sut, err := ParseEd25519Cert(srcBytes)
 	if err != nil {
 		panic(err)
@@ -77,5 +86,29 @@ func TestEd25519_Encode(t *testing.T) {
 
 	if !bytes.Equal(sut.Encode(), srcBytes[:len(srcBytes)-64]) {
 		t.Errorf("Encode() returned unexpected bytes")
+	}
+}
+
+func TestEd25519_VerifyAsIdentitySigning(t *testing.T) {
+	sut, err := ParseEd25519Cert(mustLoadTestPEM("testdata/type04.pem"))
+	if err != nil {
+		t.Fatalf("ParseEd25519Cert failed: %v", err)
+	}
+
+	gotErr := sut.VerifyAsIdentitySigning()
+	if gotErr != nil {
+		t.Errorf("VerifyAsIdentitySigning failed: %v", gotErr)
+	}
+}
+
+func TestEd25519_VerifyAsNtorCC(t *testing.T) {
+	sut, err := ParseEd25519Cert(mustLoadTestPEM("testdata/type0A.pem"))
+	if err != nil {
+		t.Fatalf("ParseEd25519Cert failed: %v", err)
+	}
+
+	gotErr := sut.VerifyAsNtorCC(mustDecodeBase64("kmptPbBfqahC2ng1cB9rAfb/OTLFJIcmB4w+CV+p20A"), false)
+	if gotErr != nil {
+		t.Errorf("VerifyAsNtorCC failed: %v", gotErr)
 	}
 }

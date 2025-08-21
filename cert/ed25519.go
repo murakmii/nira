@@ -1,9 +1,12 @@
 package cert
 
 import (
+	"crypto/ed25519"
 	"encoding/binary"
 	"errors"
 	"time"
+
+	"filippo.io/edwards25519/field"
 )
 
 type (
@@ -12,6 +15,8 @@ type (
 
 	CertifiedKeyType byte
 
+	// Ed25519 represents binary certificates format.
+	// See: https://spec.torproject.org/cert-spec.html
 	Ed25519 struct {
 		typ        Type
 		expires    time.Time
@@ -50,6 +55,8 @@ const (
 	CertifiedDigestOfX509 CertifiedKeyType = 3
 )
 
+// ParseEd25519Cert parses binary certificates format.
+// Format: https://spec.torproject.org/cert-spec.html#ed-certs
 func ParseEd25519Cert(data []byte) (*Ed25519, error) {
 	if len(data) < 40 || data[0] != 0x01 {
 		return nil, errors.New("malformed Ed25519 cert")
@@ -98,7 +105,8 @@ func (c *Ed25519) Key() []byte               { return c.key }
 func (c *Ed25519) Extensions() []*Ed25519Ext { return c.extensions }
 func (c *Ed25519) Signature() []byte         { return c.signature }
 
-// Encode cert without signature.
+// Encode encodes certificate to binary format.
+// This method is reverse process of ParseEd25519Cert.
 func (c *Ed25519) Encode() []byte {
 	totalLen := 40
 	for _, ext := range c.extensions {
@@ -119,6 +127,52 @@ func (c *Ed25519) Encode() []byte {
 	}
 
 	return encoded
+}
+
+// VerifyAsIdentitySigning verify certificate(IDENTITY_V_SIGNING) signature.
+func (c *Ed25519) VerifyAsIdentitySigning() error {
+	if c.typ != ForIdentitySigning {
+		return errors.New("cert is not for identity signing")
+	}
+	if len(c.extensions) != 1 || c.extensions[0].Type() != SignedWithEd25519KeyExt {
+		return errors.New("cert has no signing key")
+	}
+
+	if !ed25519.Verify(c.extensions[0].Data(), c.Encode(), c.signature) {
+		return errors.New("invalid signature")
+	}
+
+	return nil
+}
+
+// VerifyAsNtorCC verify certificate(NTOR_CC_IDENTITY) signature.
+func (c *Ed25519) VerifyAsNtorCC(ntorKey []byte, bit bool) error {
+	if c.typ != ForNtorCcIdentity {
+		return errors.New("cert is not for ntor cross certificate")
+	}
+
+	// ntorKey(curve25519 public key) converts to ed25519 public key.
+	// See: https://spec.torproject.org/dir-spec/converting-to-ed25519.html
+	//      https://gitlab.torproject.org/tpo/core/tor/-/blob/main/src/ext/ed25519/ref10/keyconv.c
+	u := new(field.Element)
+	if _, err := u.SetBytes(ntorKey); err != nil {
+		return err
+	}
+
+	one := new(field.Element).One()
+
+	uMinus1 := new(field.Element).Subtract(u, one)
+	uPlus1Inv := new(field.Element).Invert(new(field.Element).Add(u, one))
+
+	edNK := new(field.Element).Multiply(uMinus1, uPlus1Inv).Bytes()
+	if bit {
+		edNK[31] |= 1 << 7
+	}
+
+	if !ed25519.Verify(edNK, c.Encode(), c.signature) {
+		return errors.New("ntor cross certificate verification failed")
+	}
+	return nil
 }
 
 func (ext *Ed25519Ext) Type() ExtType   { return ext.typ }
